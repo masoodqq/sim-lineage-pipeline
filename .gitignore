@@ -1,0 +1,4 @@
+venv/
+sim_outputs/
+__pycache__/
+*.pyc
