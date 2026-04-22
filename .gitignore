@@ -1,4 +1,44 @@
+# Virtual environment
 venv/
+
+# Simulation output files (generated at runtime)
 sim_outputs/
+
+# Delta Lake data (generated at runtime)
+delta/
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Environment variables
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Java / Spark
+*.class
+*.jar
+metastore_db/
+derby.log
+spark-warehouse/
