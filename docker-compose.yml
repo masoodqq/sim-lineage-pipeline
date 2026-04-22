@@ -1,17 +1,4 @@
 services:
-  # # --- KAFKA INFRASTRUCTURE ---
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:7.6.0
-  #   ports:
-  #     - "2181:2181"
-  #   environment:
-  #     - ALLOW_ANONYMOUS_LOGIN=yes
-  #   healthcheck:
-  #     test: ["CMD", "zkServer.sh", "status"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     ports:
@@ -19,29 +6,41 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "sleep 15 && kafka-topics --create --if-not-exists --topic sim-outputs --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 &&
+      kafka-topics --create --if-not-exists --topic pipeline-metadata --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1"
 
   # --- SPARK CLUSTER ---
   spark-master:
-    image: apache/spark:3.5.1
+    image: bitnamilegacy/spark:3.5
     environment:
       - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
     ports:
       - "8080:8080" # Spark Master Web UI
       - "7077:7077" # Spark Master Port
 
   spark-worker:
-    image: apache/spark:3.5.1
+    image: bitnamilegacy/spark:3.5
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
     depends_on:
       - spark-master
     ports:
@@ -54,6 +53,6 @@ services:
       - "8090:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
     depends_on:
       - kafka
