@@ -42,3 +42,4 @@ logs/
 metastore_db/
 derby.log
 spark-warehouse/
+metadata.db
