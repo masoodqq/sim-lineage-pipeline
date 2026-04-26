@@ -1,6 +1,7 @@
 services:
   kafka:
     image: confluentinc/cp-kafka:7.6.0
+    restart: unless-stopped
     ports:
       - "9092:9092"
     environment:
@@ -26,6 +27,7 @@ services:
   # --- SPARK CLUSTER ---
   spark-master:
     image: bitnamilegacy/spark:3.5
+    restart: unless-stopped
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
@@ -36,6 +38,7 @@ services:
 
   spark-worker:
     image: bitnamilegacy/spark:3.5
+    restart: unless-stopped
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
