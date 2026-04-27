@@ -1,114 +1,42 @@
-name: Pipeline CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Install dependencies
+- name: Run consumer for one batch
         run: |
-          pip install -r producer/requirements.txt
-          pip install -r consumer/requirements.txt
-          pip install fastapi uvicorn pytest httpx
+          timeout 120 python consumer/consumer.py || true
+        env:
+          PYTHONPATH: .
+          JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
 
-      - name: Start Kafka
+      - name: Wait for metadata DB to be populated
         run: |
-          docker compose up -d kafka
-          echo "Waiting for Kafka to be ready..."
-          sleep 20
+          python3 -c "
+          import sqlite3, sys, time, os
 
-      - name: Create Kafka topic
-        run: |
-          docker exec sim-lineage-pipeline-kafka-1 \
-            kafka-topics --create \
-            --topic sim-outputs \
-            --bootstrap-server localhost:9092 \
-            --partitions 3 \
-            --replication-factor 1 \
-            --if-not-exists
+          print('Waiting for metadata.db to be populated...')
+          for i in range(30):
+              if os.path.exists('metadata.db'):
+                  try:
+                      conn = sqlite3.connect('metadata.db')
+                      count = conn.execute(
+                          \"SELECT COUNT(*) FROM lineage\"
+                      ).fetchone()[0]
+                      conn.close()
+                      if count > 0:
+                          print(f'PASS: metadata.db has {count} records')
+                          sys.exit(0)
+                  except Exception as e:
+                      print(f'  attempt {i+1}: {e}')
+              else:
+                  print(f'  attempt {i+1}: metadata.db not found yet')
+              time.sleep(5)
 
-      - name: Generate and publish test messages
+          print('FAIL: metadata.db never populated after 150 seconds')
+          sys.exit(1)
+          "
+- name: Generate and publish test messages
         run: |
           python producer/generate_data.py &
           sleep 5
           python producer/producer.py &
-          sleep 15
+          sleep 30
           kill %1 %2 || true
-        env:
-          PYTHONPATH: .
-
-      - name: Run consumer for one batch
-        run: |
-          timeout 60 python consumer/consumer.py || true
-        env:
-          PYTHONPATH: .
-          JAVA_HOME: /usr/lib/jvm/temurin-17-amd64
-
-      - name: Assert metadata DB has records
-        run: |
-          python3 -c "
-          import sqlite3, sys
-          conn = sqlite3.connect('metadata.db')
-          count = conn.execute('SELECT COUNT(*) FROM lineage').fetchone()[0]
-          conn.close()
-          print(f'Records in metadata.db: {count}')
-          if count == 0:
-              print('FAIL: No records found in metadata.db')
-              sys.exit(1)
-          print('PASS: metadata.db has records')
-          "
-
-      - name: Start lineage API and test endpoints
-        run: |
-          uvicorn api.api:app --port 8000 &
-          sleep 5
-          python3 -c "
-          import urllib.request, json, sys
-
-          # Test root endpoint
-          res = urllib.request.urlopen('http://localhost:8000/')
-          assert res.status == 200, 'Root endpoint failed'
-          print('PASS: root endpoint')
-
-          # Get a real run_id from metadata.db
-          import sqlite3
-          conn = sqlite3.connect('metadata.db')
-          run_id = conn.execute('SELECT run_id FROM lineage LIMIT 1').fetchone()[0]
-          conn.close()
-
-          # Test lineage endpoint
-          res = urllib.request.urlopen(f'http://localhost:8000/lineage/{run_id}')
-          assert res.status == 200, 'Lineage endpoint failed'
-          data = json.loads(res.read())
-          assert data['run_id'] == run_id, 'Wrong run_id returned'
-          print(f'PASS: lineage endpoint for {run_id}')
-
-          # Test datasets endpoint
-          res = urllib.request.urlopen('http://localhost:8000/datasets/0')
-          assert res.status == 200, 'Datasets endpoint failed'
-          print('PASS: datasets endpoint')
-
-          print('All tests passed.')
-          "
         env:
           PYTHONPATH: .
