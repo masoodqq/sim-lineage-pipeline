@@ -21,7 +21,19 @@ def generate_file():
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             f.write(json.dumps(record) + "\n")
-    print(f"Generated {filename}")
+    
+    # add one bad record per file to test DLQ
+    # bad_record = {
+    #     "cell_name": None,
+    #     "tool": "SPICE",
+    #     "tool_version": "18.2",
+    #     "metric": None,
+    #     "value": None,
+    #     "timestamp": datetime.now(timezone.utc).isoformat()
+    # }
+    # with open(filename, "w") as f:
+    #     f.write(json.dumps(bad_record) + "\n")
+    # print(f"Generated {filename}")
 
 if __name__ == "__main__":
     print("Generating fake simulation files every 10 seconds. Ctrl+C to stop.")
