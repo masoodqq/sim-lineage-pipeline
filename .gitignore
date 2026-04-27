@@ -43,3 +43,4 @@ metastore_db/
 derby.log
 spark-warehouse/
 metadata.db
+personal_notes.txt
