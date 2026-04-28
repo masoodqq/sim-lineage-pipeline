@@ -20,7 +20,7 @@ from pyspark.sql.types import (
 )
 from metadata_store import init_db, insert_lineage
 from kafka import KafkaProducer as KafkaProducerClient
-
+from delta import DeltaTable
 
 os.environ["JAVA_HOME"]             = JAVA_HOME
 os.environ["PYSPARK_PYTHON"]        = sys.executable
@@ -32,8 +32,6 @@ VENV_PYSPARK = os.path.join(
     "site-packages"
 )
 sys.path.insert(0, VENV_PYSPARK)
-
-
 
 os.makedirs(DELTA_PATH, exist_ok=True)
 os.makedirs(METADATA_PATH, exist_ok=True)
@@ -146,7 +144,6 @@ def process_batch(batch_df, batch_id):
             .mode("append") \
             .save(DELTA_PATH)
 
-        from delta import DeltaTable
         delta_table   = DeltaTable.forPath(spark, DELTA_PATH)
         delta_version = delta_table.history(1).collect()[0]["version"]
 
